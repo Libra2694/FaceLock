@@ -110,9 +110,10 @@ def start_gui():
 
     tk.Button(window, text="📷 Mulai Scan", command=on_scan, bg="#4ade80", fg="black", font=("Helvetica", 12)).pack(pady=5)
     tk.Button(window, text="❌ Batal / Reset", command=reset_gui, bg="#f87171", fg="white", font=("Helvetica", 11)).pack(pady=5)
-
+    
     tk.Label(window, text="Tekan [ESC] saat kamera aktif untuk keluar dari scan.", font=("Helvetica", 9), bg="#f3f4f6", fg="#6b7280").pack(pady=10)
 
+    
     window.mainloop()
 
 
