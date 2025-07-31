@@ -1,22 +1,11 @@
+import tkinter as tk
+from tkinter import messagebox
 import cv2
 import numpy as np
 import mysql.connector
 from datetime import datetime
 import os
-import time
-from colorama import Fore, Style, init
 
-init(autoreset=True)
-
-def line():
-    print(Fore.CYAN + "-" * 40)
-
-# === Load Nama ===
-def load_names():
-    with open("names.txt", "r") as file:
-        return [line.strip() for line in file.readlines()]
-
-# === Koneksi DB ===
 def connect_db():
     return mysql.connector.connect(
         host="localhost",
@@ -25,7 +14,6 @@ def connect_db():
         database="absensi"
     )
 
-# === Simpan Absensi ===
 def simpan_kehadiran(nama, status):
     db = connect_db()
     cursor = db.cursor()
@@ -36,27 +24,16 @@ def simpan_kehadiran(nama, status):
     db.commit()
     cursor.close()
     db.close()
-    print(Fore.GREEN + f"[✔] Tercatat: {nama} | {status} | {waktu}")
+    log = f"{nama} | {status} | {waktu}"
+    print(log)
+    return log
 
-# === UI Pilih Status ===
-def pilih_status():
-    line()
-    print(Fore.YELLOW + " FACELOCK ABSENSI ".center(40, "="))
-    line()
-    print(Fore.BLUE + "[1] Absensi Masuk")
-    print(Fore.BLUE + "[2] Absensi Keluar")
-    line()
-    choice = input(Fore.CYAN + "Pilih status [1/2]: ").strip()
-    if choice == "1":
-        return "Masuk"
-    elif choice == "2":
-        return "Keluar"
-    else:
-        print(Fore.RED + "[!] Pilihan tidak valid.")
-        exit()
+def load_names():
+    with open("names.txt", "r") as f:
+        return [line.strip() for line in f.readlines()]
 
-# === Load Model ===
-def jalankan_absensi(status_absen):
+# === Pengenalan Wajah ===
+def mulai_scan(status_absen, result_text):
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     recognizer.read('trainer/face_trainer.yml')
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -66,17 +43,13 @@ def jalankan_absensi(status_absen):
     cam.set(3, 640)
     cam.set(4, 480)
 
-    print(Fore.MAGENTA + f"\n[•] Mode Absensi: {status_absen}")
-    print(Fore.YELLOW + "[ESC] untuk keluar")
-    print(Fore.CYAN + "Scanning wajah...\n")
-    time.sleep(1)
-
+    result_text.set("🔍 Scanning wajah... (Tekan ESC untuk batal)")
     recognized_ids = set()
 
     while True:
         ret, frame = cam.read()
         if not ret:
-            print(Fore.RED + "[!] Kamera tidak terdeteksi.")
+            messagebox.showerror("Error", "Kamera tidak terdeteksi.")
             break
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -88,32 +61,61 @@ def jalankan_absensi(status_absen):
 
             if confidence < 50:
                 name = names[id_pred - 1]
-                confidence_text = f"{round(100 - confidence)}%"
-                color = (0, 255, 0)
-
                 if id_pred not in recognized_ids:
-                    simpan_kehadiran(name, status_absen)
+                    log = simpan_kehadiran(name, status_absen)
+                    result_text.set("✅ " + log)
                     recognized_ids.add(id_pred)
-
             else:
-                name = "Unknown"
-                confidence_text = f"{round(100 - confidence)}%"
-                color = (0, 0, 255)
+                result_text.set("❌ Wajah tidak dikenali")
 
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(frame, str(name), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-            cv2.putText(frame, str(confidence_text), (x + 5, y + h + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0,255,0), 2)
+            cv2.putText(frame, name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
 
-        cv2.imshow('FaceLock Absensi', frame)
-
-        k = cv2.waitKey(1)
-        if k == 27:
+        cv2.imshow("FaceLock Absensi", frame)
+        if cv2.waitKey(1) == 27:
+            result_text.set("🚫 Scan dibatalkan.")
             break
 
     cam.release()
     cv2.destroyAllWindows()
 
-# === Eksekusi ===
+# === GUI Setup ===
+# ... kode sebelumnya tetap ...
+
+def start_gui():
+    window = tk.Tk()
+    window.title("FaceLock - Absensi Wajah")
+    window.geometry("400x320")
+    window.configure(bg="#f3f4f6")
+
+    tk.Label(window, text="🧑‍💼 FaceLock Absensi", font=("Helvetica", 16, "bold"), bg="#f3f4f6").pack(pady=10)
+
+    status_var = tk.StringVar(value="Masuk")
+    tk.Radiobutton(window, text="Masuk", variable=status_var, value="Masuk", bg="#f3f4f6").pack()
+    tk.Radiobutton(window, text="Keluar", variable=status_var, value="Keluar", bg="#f3f4f6").pack()
+
+    result_text = tk.StringVar()
+    result_label = tk.Label(window, textvariable=result_text, bg="#f3f4f6", fg="green", font=("Helvetica", 12))
+    result_label.pack(pady=10)
+
+    def on_scan():
+        result_text.set("🕵️ Scanning wajah... Tekan [ESC] untuk keluar.")
+        window.update()
+        mulai_scan(status_var.get(), result_text)
+        result_text.set("✔ Silakan pilih absensi lagi.")  # Setelah scan selesai
+
+    def reset_gui():
+        status_var.set("Masuk")
+        result_text.set("")
+
+    tk.Button(window, text="📷 Mulai Scan", command=on_scan, bg="#4ade80", fg="black", font=("Helvetica", 12)).pack(pady=5)
+    tk.Button(window, text="❌ Batal / Reset", command=reset_gui, bg="#f87171", fg="white", font=("Helvetica", 11)).pack(pady=5)
+
+    tk.Label(window, text="Tekan [ESC] saat kamera aktif untuk keluar dari scan.", font=("Helvetica", 9), bg="#f3f4f6", fg="#6b7280").pack(pady=10)
+
+    window.mainloop()
+
+
+# === Jalankan ===
 if __name__ == "__main__":
-    status = pilih_status()
-    jalankan_absensi(status)
+    start_gui()
