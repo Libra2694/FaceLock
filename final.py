@@ -63,13 +63,15 @@ def mulai_scan(status_absen, result_text):
                 name = names[id_pred - 1]
                 if id_pred not in recognized_ids:
                     log = simpan_kehadiran(name, status_absen)
-                    result_text.set("✅ " + log)
+                    result_text.set(log)
                     recognized_ids.add(id_pred)
             else:
-                result_text.set("❌ Wajah tidak dikenali")
+                name = "Unknown"
+                result_text.set("Wajah tidak dikenali")
 
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0,255,0), 2)
             cv2.putText(frame, name, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+
 
         cv2.imshow("FaceLock Absensi", frame)
         if cv2.waitKey(1) == 27:
